@@ -134,11 +134,16 @@ def formulate_simplequad_ocp():
     ocp.constraints.idxbx = np.array([7, 8, 9, 10, 11, 12])
     ocp.constraints.lbx = x_lb
     ocp.constraints.ubx = x_ub
+    # ocp.constraints.x0 = np.array([0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 
     ocp.solver_options.tf = 1.0
     ocp.solver_options.integrator_type = 'IRK'
     ocp.solver_options.nlp_solver_type = 'SQP_RTI'
+    ocp.solver_options.qp_solver_iter_max = 100
     ocp.solver_options.qp_solver = 'FULL_CONDENSING_HPIPM'
+    # ocp.solver_options.nlp_solver_type = 'SQP'
+    # ocp.solver_options.levenberg_marquardt = 1e-3
+    # ocp.solver_options.qp_solver = 'PARTIAL_CONDENSING_HPIPM'
 
     ocp.acados_include_path = environ['ACADOS_SOURCE_DIR'] + '/include'
     ocp.acados_lib_path = environ['ACADOS_SOURCE_DIR'] + '/lib'
@@ -226,6 +231,7 @@ if __name__ == '__main__':
     ocpSolver.set(0, 'x', x)
     
     ocp_status = ocpSolver.solve()
+    ocpSolver.print_statistics()
 
     if ocp_status != 0:
         print('OCP_SOL: ocp_status =', ocp_status, ', exiting')
