@@ -96,16 +96,16 @@ def e(x, ref):
 
 def formulate_simplequad_ocp():
 
-    Q_p = SX([1, 1, 1])
-    Q_q = SX([1, 1, 1])
-    Q_v = SX([1, 1, 1])
-    Q_w = SX([1, 1, 1])
+    Q_p = SX([1, 1, 1]) * 10
+    Q_q = SX([1, 1, 1]) * 10
+    Q_v = SX([1, 1, 1]) * 10
+    Q_w = SX([1, 1, 1]) * 10
     Q = diag(vertcat(Q_p, Q_q, Q_v, Q_w))
 
     Q_e = Q
 
-    R_f = SX([1, 1, 1])
-    R_t = SX([1, 1, 1])
+    R_f = SX([1, 1, 1]) * 0.01
+    R_t = SX([1, 1, 1]) * 0.01
     R = diag(vertcat(R_f, R_t))
 
     u_lb = np.array([0, 0, -40, -20, -20, -20])
@@ -134,20 +134,18 @@ def formulate_simplequad_ocp():
     ocp.constraints.idxbx = np.array([7, 8, 9, 10, 11, 12])
     ocp.constraints.lbx = x_lb
     ocp.constraints.ubx = x_ub
-    # ocp.constraints.x0 = np.array([0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    ocp.constraints.x0 = np.array([0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 
     ocp.solver_options.tf = 1.0
-    ocp.solver_options.integrator_type = 'IRK'
-    ocp.solver_options.nlp_solver_type = 'SQP_RTI'
     ocp.solver_options.qp_solver_iter_max = 100
-    ocp.solver_options.qp_solver = 'FULL_CONDENSING_HPIPM'
-    # ocp.solver_options.nlp_solver_type = 'SQP'
-    # ocp.solver_options.levenberg_marquardt = 1e-3
-    # ocp.solver_options.qp_solver = 'PARTIAL_CONDENSING_HPIPM'
+    ocp.solver_options.levenberg_marquardt = 1e-3
+    ocp.solver_options.integrator_type = 'ERK'
+    ocp.solver_options.nlp_solver_type = 'SQP_RTI'
+    ocp.solver_options.qp_solver = 'PARTIAL_CONDENSING_HPIPM'
 
     ocp.acados_include_path = environ['ACADOS_SOURCE_DIR'] + '/include'
     ocp.acados_lib_path = environ['ACADOS_SOURCE_DIR'] + '/lib'
-    ocp.code_export_directory = './acados_export'
+    ocp.code_export_directory = '../acados_export'
 
     ocp.parameter_values = np.array([0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 
@@ -229,6 +227,8 @@ if __name__ == '__main__':
     print(y)
 
     ocpSolver.set(0, 'x', x)
+    ocpSolver.constraints_set(0, 'lbx', x)
+    ocpSolver.constraints_set(0, 'ubx', x)
     
     ocp_status = ocpSolver.solve()
     ocpSolver.print_statistics()
@@ -240,5 +240,77 @@ if __name__ == '__main__':
     u = ocpSolver.get(0, 'u')
     print(u)
 
-
+    # test MPC
+    print('================= test MPC =================')
     
+    x = np.array([0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    plot_x = np.zeros([13, 201])
+    plot_t = np.zeros(201)
+    plot_y = np.zeros([13, 201])
+    t_solve = np.zeros(201)
+
+    for i in range(201):
+        tsim = i * 0.01
+        
+        plot_t[i] = tsim
+        plot_x[:, i] = x
+
+        y = np.zeros([13, 21])
+
+        for j in range(21):
+            t = j * 0.05 + tsim
+            y[2, j] = -0.5 + 0.5 * cos(pi * t)
+            y[3, j] = 1
+            y[9, j] = -0.5 * pi * sin(pi * t)
+            if t > 1:
+                y[2, j] = -1
+                y[3, j] = 1
+                y[9, j] = 0
+            ocpSolver.set(j, 'p', y[:, j])
+            if j == 0:
+                plot_y[:, i] = y[:, j]
+
+        ocpSolver.set(0, 'x', x)
+        ocpSolver.constraints_set(0, 'lbx', x)
+        ocpSolver.constraints_set(0, 'ubx', x)
+
+        start = timeit.default_timer()
+        ocp_status = ocpSolver.solve()
+        stop = timeit.default_timer()
+        t_solve[i] = stop - start
+
+        if ocp_status != 0:
+            print('OCP_SOL: ocp_status =', ocp_status, ', exiting')
+            quit()
+
+        u = ocpSolver.get(0, 'u')
+
+        simSolver.set('x', x)
+        simSolver.set('u', u)
+        simSolver.solve()
+        x = simSolver.get('x')
+    
+    plt.figure('translation')
+    plt.subplot(4, 1, 1)
+    plt.plot(plot_t, plot_y[2, :])
+    plt.plot(plot_t, plot_x[2, :])
+    plt.xlabel('t')
+    plt.ylabel('z')
+    plt.subplot(4, 1, 2)
+    plt.plot(plot_t, plot_y[9, :])
+    plt.plot(plot_t, plot_x[9, :])
+    plt.xlabel('t')
+    plt.ylabel('vz')
+    plt.subplot(4, 1, 3)
+    plt.plot(plot_t, plot_y[2, :] - plot_x[2, :])
+    plt.xlabel('t')
+    plt.ylabel('delta_z')
+    plt.subplot(4, 1, 4)
+    plt.plot(plot_t, plot_y[9, :] - plot_x[9, :])
+    plt.xlabel('t')
+    plt.ylabel('delta_vz')
+
+    plt.figure('time')
+    plt.plot(plot_t, t_solve)
+
+    plt.show()        
