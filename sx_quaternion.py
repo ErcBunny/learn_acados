@@ -1,4 +1,4 @@
-from casadi import SX, cross, dot, norm_2, vertcat
+from casadi import SX, cross, dot, norm_2, vertcat, fabs
 
 
 def sx_quat_normalize(q):
@@ -43,4 +43,4 @@ def quat_err(q, p):
     q = sx_quat_normalize(q)
     p = sx_quat_normalize(p)
     q_d = sx_quat_multiply(q, sx_quat_inverse(p))
-    return q_d[1:4]
+    return q_d[1:4] * fabs(q_d[0])

@@ -145,7 +145,7 @@ def formulate_simplequad_ocp():
 
     ocp.acados_include_path = environ['ACADOS_SOURCE_DIR'] + '/include'
     ocp.acados_lib_path = environ['ACADOS_SOURCE_DIR'] + '/lib'
-    ocp.code_export_directory = '../acados_export'
+    ocp.code_export_directory = './acados_export'
 
     ocp.parameter_values = np.array([0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 
